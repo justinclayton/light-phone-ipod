@@ -1,0 +1,12 @@
+[tool]
+id = "com.thelightphone.ipod"
+label = "iPod"
+versionCode = 1
+versionName = "0.1.0"
+permissions = ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK_STATE", "android.permission.CAMERA"]
+# Detached playback: the queue keeps playing (and LightOS shows transport
+# controls) after the tool is closed. See docs/design_decisions/detached_audio.md.
+capabilities = ["detached-audio"]
+# emulator for local dev; switch to "com.lightos" when sideloading to a real LP3
+serverPackage = "com.thelightphone.sdk.emulator"
+# serverPackage = "com.lightos"
