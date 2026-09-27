@@ -1,52 +1,177 @@
-# light-sdk
-or: a tool for building Tools
+# iPod for the Light Phone III
 
-## tl;dr
-This repository contains the scaffolding for building simple tools for the Light Phone III. Included are a library ([:sdk:client](./sdk/client)) and placeholder application ([:tool](./tool)) that depends on it. To create a tool that is fully compatible with LightOS, you must write your application code within the `tool` module, using the primitives provided by the sdk client library.
+A music player tool for LightOS, modelled on the iPod classic, plus a small
+macOS app that gets songs from a Mac onto the phone over Wi-Fi.
 
-You can and should use current Android best practices: Kotlin for all source code, Compose for UI, Coroutines for async programming, and MVVM architecture. **Although this is appears to be a fairly standard Android dev environment, you will quickly find out that we are (gently but broadly) restricting which Android APIs and third-party libraries can be used. This is in an effort to provide a secure and distinctly _light_ experience for our users. These restrictions are _not_ set in stone and should ease up over time. If there is a stable, open-source library that you'd like us to allow, please let us know! More on this later.**
+Browse by **Artists / Albums / Songs / Playlists / Search**, pick a song, and it
+plays. Music keeps playing after you leave the tool, and LightOS shows the
+transport controls. There is no album art, no streaming, and no account. The
+library is files you own, tagged the way iTunes tagged them.
 
-## IMPORTANT!! July 1, 2026 Update
-If you're reading this, welcome! You're early! (in a cool way)
-This repo is a work-in-progress and will remain so for a while. Things are going to change _fast_ in the coming weeks. If you're going to start building right away, be sure to `git pull` frequently.
-Before you do, though, please be aware that **while we feel good about letting everybody start to explore and build, we are still working on the infrastructure to properly deploy your new tools.**
-The currently builds of LightOS in the wild are not yet ready to "play nice" with the tools built here. If you're someone who's already comfortable working with ADB to sideload APKs on your
-Light Phone III, you can totally do that with whatever you do here! But we're shooting to make these tools feel as seamless as the ones already available in LightOS, and that's going to take a bit more work. 
-We're hoping to have an update on that front later this month. In the meantime, the best way to start working is to use an Android emulator running our new [LightOS Emulator](sdk/emulator). The instructions for getting that up and running
-are [right here](docs/system_app).
+> **Status:** v1 of both halves is implemented and verified on the LightOS
+> emulator. Nothing has been tested on real LP3 hardware yet. See
+> [What is unverified](#what-is-unverified) before relying on it.
 
-## Quickstart
+## How it fits together
 
-### Running your Tool
-**You can test your tool on any Android device or emulator**, but certain functionality (receiving push notifications, requesting special permissions) can only be tested with:
-A) Real Light Phone hardware running LightOS
-B) An Android emulator (on your computer) set up to run our LightOS emulator app as a _system app_ ([see advanced instructions](docs/system_app))
+```
+ Mac (mac/)                                   Light Phone III (tool/)
+ ┌────────────────────────┐   home Wi-Fi     ┌──────────────────────────────┐
+ │ Drop songs on window   │                  │ iPod tool opens, pulls queue │
+ │ Preflight tag check    │ ◀─ GET /v1/queue─│ downloads into files/shared/ │
+ │ HTTPS server, pinned   │ ◀─ GET /v1/files─│   music/<Artist>/<Album>/..  │
+ │ cert + bearer token    │ ◀─ POST /v1/ack ─│ rescans tags, updates Room   │
+ └────────────────────────┘                  └──────────────────────────────┘
+```
 
-You can quickly [create an emulator](https://developer.android.com/studio/run/managing-avds) that generally feels like an LPIII by using the following settings:
-* 1080 X 1240, 3.92" display
-* Android API 34
-* NO Google Play Services installed
+**The phone pulls, the Mac serves.** A LightOS tool's storage is sealed: nothing
+on a host computer can write into it, over USB or otherwise. The tool *can*
+fetch over the local network, so the Mac holds a queue and the phone comes and
+gets it when the tool is opened. Both devices have to be awake and on the same
+Wi-Fi at the same time. That constraint drives the whole design and is written
+up in [docs/mac-loader.prd.md](docs/mac-loader.prd.md).
 
-### Start Building
-1. Fork and/or clone this repository into your local dev environment.
-2. Install Android Studio and open this project within it. (IntelliJ IDEA should also work)
+Pairing is one QR scan. The Mac shows an `lp3music://pair?...` code carrying its
+address, a bearer token, and the SHA-256 fingerprint of its self-signed TLS
+certificate. The phone trusts only that certificate, the Mac accepts only that
+token. The wire contract is in [docs/mac-loader.protocol.md](docs/mac-loader.protocol.md).
 
-3. Edit the code in `HomeScreen` and `HomeScreenViewModel` to get started. `Homescreen` surfaces a `@Composable` method named `Content`. This is the UI that is shown when the tool first boots. You'll notice this UI sources data from it's `viewModel` field, which is an instance of `HomeScreenViewModel`. Edit that class with your screen's logic and expose the data to the UI using either Compose `State` or Coroutine `Flow`s. If you want to create a new screen, create a new Screen/ViewModel pair: your screen should extend from `LightScreen` and your VM from `LightScreenViewModel`. Your screen implementation will need:
-   1. A direct reference to your ViewModel's class type
-   2. A factory method for creating a new instance of your ViewModel.
+**Why the library lives inside the tool.** The Light SDK's build plugin fails
+the build on any use of `Context`, `contentResolver`, `Intent`, casts to
+framework types, or reflection. A tool therefore cannot read the phone's shared
+MediaStore or the built-in Music tool's files. This project's library is the
+tool's own `files/shared/music/` folder, and the tool reads ID3 and iTunes tags
+itself with `MediaMetadataRetriever` and caches them in Room. The spike that
+established this is in [FINDINGS.md](FINDINGS.md).
 
-Look at `HomeScreen` as an example for how this is done. To navigate to your new screen, use the `navigateTo` function built into `LightScreen` - just pass it a lambda to create an instance of your new screen. Note that the `LightScreen` constructor takes in a `SealedLightActivity`. The lambda is provided an instance of this as a default parameter.
+## What the phone tool does
 
-Since LightOS does not use Android system navigation, we provide a back button for you. As long as you use `navigateTo` to move between screens, our back button should work great. If need be, you can override the `onBackPressed` method in your `LightViewModel`.
+- **Browsing** follows iPod rules: leading "The", "A", "An" ignored for sort,
+  albums grouped by album artist, compilations in their own bucket, artists who
+  appear only on compilations left out of the Artists list, missing tags fall
+  back to "Unknown Artist" / "Unknown Album".
+- **Playback** uses one shared detached `LightAudioPlayer`. Selecting a song in
+  any list replaces the queue with that list, positioned at the selection.
+  Shuffle and repeat are supported. The queue and position survive relaunch.
+- **Playlists** live in Room and are mirrored to `files/shared/playlists/*.m3u8`
+  after every change. Any `.m3u8` the Mac side drops in is imported on scan.
+- **Sync** runs automatically when the tool opens (throttled to once a minute)
+  and on demand from the Sync screen. Every failure is a sentence the user can
+  act on, listed in the protocol doc's section 4.
+- **Rescan Library** from the main menu diffs the folder by path, size and
+  mtime and only re-reads tags for new or changed files.
 
-### Sharing Your Tool
-**As of July 1, 2026, there's no "easy" way to share your tool with a Light Phone III user. We're working hard on that. This is how we believe it's going to look.**
+Design decisions and the v1 scope are recorded in [docs/ipod.adr.md](docs/ipod.adr.md).
 
-Given our relatively limited resources and desire to keep our users safe, we're requiring that all community tools be open source (including our own!). We will be building and signing these tools directly from a publicly available git commit, and we'll be archiving the source at build time. You're free to build and share privately, but LightOS won't let you install tools that are not signed by us without acknowledging privacy and performance risks. We won't block users from performing these "dangerous" sideloads, but we're not going to encourage it either. In the near future, you'll be able to queue up a build of your tool on our servers, and if it follows our guidelines and compiles cleanly, we will hand you back a signed, shareable APK.
+## Repository layout
 
-Once we release a version of LightOS that supports community tools, users will have an option to choose what kind of tools they want to be able to run on their device:
-- **Light-approved tools**: These include tools that are either built internally by the Light team, or built by the community and officially tested/signed-off by the Light team. We don't know _exactly_ what that sign-off process is going to look like, but as a heads-up: we're going to be looking pretty hard at whether a submitted tool matches the Light ethos both functionally and aesthetically. We've included a UX/UI library to make this as easy as possible! From a technical standpoint, these approved tools are both signed by us _and_ added to an "allow-list" within LightOS. Phones with this option selected will only install and display tools that meet both criteria.
-- **SDK-built tools**: This is a slightly more permissive choice. Phones with this option selected will install and launch any tool that was built and signed by Light. These don't require any manual approval by us (though we can block them in extreme cases). If a user wants to be able to install a tool that was shared locally or somewhere outside of Light's dashboard, but they still want to be confident that it will run well and integrate nicely with LightOS, they might choose this option!
-- **Any tools**: A user will have the option to make any APK launchable from LightOS, but they will own the responsibility of getting them un/installed. When a user selects this option, we will be warning them that they are potentially opening their device up to security risks, and in doing so will limit our ability to support them if something goes wrong.
+This repo started as a fork of Light's official
+[light-sdk](https://github.com/lightphone/light-sdk) scaffolding, and the SDK
+modules are still here so the tool builds against a pinned copy of them.
 
-## [Complete Documentation](./docs)
+| Path | What it is |
+| --- | --- |
+| `tool/` | The iPod tool. All app code is under `com.thelightphone.ipod`: `data/` (Room, scanner, M3U, sync), `player/`, `ui/`. |
+| `mac/` | The macOS companion, "Music Loader". SwiftUI, no third-party dependencies. Has its own [README](mac/README.md). |
+| `docs/ipod.adr.md` | Architecture decision record for the tool. |
+| `docs/mac-loader.prd.md` | Product requirements for the Mac app and the phone's receiving side. |
+| `docs/mac-loader.protocol.md` | The HTTPS API and pairing-code format both sides implement. |
+| `FINDINGS.md` | The original spike: why a tool cannot read the phone's shared music. |
+| `sideloading.md` | How to install a locally built APK on an LP3 or the emulator via Light's Tool Manager. |
+| `sdk/` | Light's SDK modules (client, ui, shared, server, emulator). Upstream code. |
+| `plugin/`, `lint-rules/`, `builder/` | Light's build-time sandbox plugin, lint rules, and signing pipeline. Upstream code. |
+| `examples/` | Light's demo tools. `audio-demo` is the reference for detached playback. |
+| `.scratch/` | Backlog notes for known gaps, written as issue drafts. |
+
+## Building and running
+
+### Prerequisites
+
+- JDK 17
+- Android SDK with an emulator, or a Light Phone III in developer mode
+- For the Mac app: Xcode and [xcodegen](https://github.com/yonaskolb/XcodeGen)
+
+### Phone tool
+
+```bash
+./gradlew :tool:assembleDebug          # build the APK
+./gradlew :tool:testDebugUnitTest      # JVM unit tests
+./gradlew check                        # what CI runs on every PR
+```
+
+The `Makefile` wraps the common loop with `make build`, `make install`,
+`make run`, `make logs` and `make emu`. Its `JAVA_HOME`, SDK and `adb` paths
+are hard-coded for a Homebrew install on macOS, so edit the top of the file
+or export your own values if your setup differs.
+
+For an emulator that feels like an LP3, create an AVD at 1080x1240, API 34,
+without Google Play. To exercise detached playback, permissions or push, the
+LightOS emulator app has to be installed as a system app and the AVD booted
+with `-writable-system`. Instructions are in [docs/system_app](docs/system_app).
+In LightOS, set Settings → Allowed Tools to "Built with SDK" or the tool will
+not appear.
+
+### Getting music on during development
+
+You do not need the Mac app to test. Drop audio files into a `library/` folder
+at the repo root and run:
+
+```bash
+make sync
+```
+
+This pushes them into the debug build's private `files/shared/music/` via
+`adb run-as`, then relaunches the tool. It works on the emulator and on a
+USB-connected LP3 running a debug build. Supported extensions are
+`mp3 m4a aac wav ogg flac`.
+
+### Mac companion
+
+```bash
+cd mac && xcodegen generate
+open LP3MusicLoader.xcodeproj
+```
+
+Full build and test notes, including how to run the phone's contract test
+against a live copy of the Mac app, are in [mac/README.md](mac/README.md).
+
+### Installing on a real phone
+
+Follow [sideloading.md](sideloading.md), which is Light's upstream guide to
+uploading an APK through their Tool Manager. Two caveats: Light had not yet
+shipped Tool Manager support to production LightOS builds as of that document's
+last update, and the `uploadTool` Gradle task it mentions is not present in
+this fork's `tool/build.gradle.kts`, so use the browser upload path.
+
+## What is unverified
+
+From the PRD's assumptions section, none of these have been tested on hardware:
+
+- That an LP3 can reach the Mac over a real home network.
+- That the phone camera can scan the pairing QR from a Mac screen in one shot.
+- That the tool can be sideloaded and stays installed after adjusting the
+  phone's tool-permission setting.
+- How much music the phone can hold, and whether Wi-Fi transfer speed is
+  tolerable for an album-sized drop.
+
+## Known limitations
+
+- **Music can be added but not removed.** Neither side deletes files. A draft
+  for fixing this is in `.scratch/delete-synced-music/`.
+- **The Mac app must stay open** while songs are queued. There is no
+  background helper.
+- **Duplicates are possible** when the same song is dropped under two
+  different filenames. Same path and same size is treated as the same song.
+- **No album art, ratings, play counts, gapless, or hardware key mapping** in
+  v1.
+- **The name.** "iPod" is Apple's trademark. It is fine as a personal label
+  and must change before any public submission to Light's tool library.
+
+## Contributing and license
+
+The upstream [CONTRIBUTING.md](CONTRIBUTING.md) and
+[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) are Light's and describe how to
+contribute to the SDK itself. For this project, open an issue first. CI runs
+`./gradlew check` on every pull request against `main`.
+
+Licensed under the [MIT License](LICENSE).
