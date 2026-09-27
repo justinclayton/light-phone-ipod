@@ -62,3 +62,9 @@ dependencies {
     testImplementation(libs.kotlin.test)
     ksp(libs.androidx.room.compiler)
 }
+
+// Forward `-Dmac.pairing=<code>` to the test JVM so LiveMacContractTest can talk to a running Mac app.
+tasks.withType<Test>().configureEach {
+    System.getProperty("mac.pairing")?.let { systemProperty("mac.pairing", it) }
+    testLogging { showStandardStreams = true }
+}

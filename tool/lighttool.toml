@@ -7,6 +7,7 @@ permissions = ["android.permission.INTERNET", "android.permission.ACCESS_NETWORK
 # Detached playback: the queue keeps playing (and LightOS shows transport
 # controls) after the tool is closed. See docs/design_decisions/detached_audio.md.
 capabilities = ["detached-audio"]
-# emulator for local dev; switch to "com.lightos" when sideloading to a real LP3
-serverPackage = "com.thelightphone.sdk.emulator"
-# serverPackage = "com.lightos"
+# Preferred SDK server. LightSdkApplication falls back to whichever server is
+# actually installed (LightOS on a real LP3, the emulator app on an AVD), so
+# the same debug APK runs on both without editing this line.
+serverPackage = "com.lightos"

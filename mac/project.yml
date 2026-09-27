@@ -1,0 +1,66 @@
+name: LP3MusicLoader
+options:
+  bundleIdPrefix: com.thelightphone.ipod
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+    CODE_SIGN_STYLE: Automatic
+    CODE_SIGN_IDENTITY: "-"
+    ENABLE_HARDENED_RUNTIME: NO
+    DEAD_CODE_STRIPPING: YES
+targets:
+  LP3MusicLoader:
+    type: application
+    platform: macOS
+    sources:
+      - path: Loader
+    info:
+      path: Loader/Resources/Info.plist
+      properties:
+        CFBundleName: Music Loader
+        CFBundleDisplayName: Music Loader
+        CFBundleShortVersionString: "0.1.0"
+        CFBundleVersion: "1"
+        LSMinimumSystemVersion: "14.0"
+        LSApplicationCategoryType: public.app-category.music
+        NSHumanReadableCopyright: ""
+        NSLocalNetworkUsageDescription: Music Loader shares songs with your Light Phone over your home Wi-Fi.
+        NSSupportsAutomaticTermination: false
+        NSSupportsSuddenTermination: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thelightphone.ipod.macloader
+        PRODUCT_NAME: Music Loader
+        PRODUCT_MODULE_NAME: LP3MusicLoader
+        ENABLE_APP_SANDBOX: NO
+        GENERATE_INFOPLIST_FILE: NO
+  LP3MusicLoaderTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: LoaderTests
+    dependencies:
+      - target: LP3MusicLoader
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.thelightphone.ipod.macloader.tests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Music Loader.app/Contents/MacOS/Music Loader"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+schemes:
+  LP3MusicLoader:
+    build:
+      targets:
+        LP3MusicLoader: all
+        LP3MusicLoaderTests: [test]
+    run:
+      config: Debug
+    test:
+      config: Debug
+      targets:
+        - LP3MusicLoaderTests

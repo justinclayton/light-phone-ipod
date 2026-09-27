@@ -139,6 +139,10 @@ class ManifestGeneratorTest {
             "expected LIGHT_SERVER_PACKAGE meta-data name; got:\n$xml"
         )
         assertTrue(
+            xml.contains("""<action android:name="com.thelightphone.sdk.action.BIND_SERVICE" />"""),
+            "expected a <queries> intent for the SDK bind action so the client can discover the installed server; got:\n$xml"
+        )
+        assertTrue(
             xml.contains("""android:value="com.lightos""""),
             "expected com.lightos as meta-data value; got:\n$xml"
         )

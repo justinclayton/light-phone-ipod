@@ -1,6 +1,7 @@
 package com.thelightphone.sdk
 
 import android.app.Application
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.util.Log
 import androidx.room.Room
@@ -35,11 +36,32 @@ open class LightSdkApplication : Application() {
         LightServiceConnection.bind(this, serverPackage)
     }
 
+    /**
+     * The SDK server to bind to. `lighttool.toml` declares a preferred package
+     * (LightOS on a real phone, the emulator app on an AVD), but a debug APK is
+     * routinely installed on both. So: use the declared package when it is
+     * installed, otherwise fall back to whichever server actually exposes the
+     * SDK bind service. Visibility comes from the `<queries>` block the plugin
+     * generates.
+     */
     @Suppress("DEPRECATION")
     private fun readServerPackage(): String {
         val appInfo = packageManager.getApplicationInfo(packageName, PackageManager.GET_META_DATA)
-        return requireNotNull(appInfo.metaData?.getString("com.thelightphone.sdk.LIGHT_SERVER_PACKAGE")) {
+        val declared = requireNotNull(appInfo.metaData?.getString("com.thelightphone.sdk.LIGHT_SERVER_PACKAGE")) {
             "LIGHT_SERVER_PACKAGE not found in manifest — set tool.serverPackage in lighttool.toml"
+        }
+        val installed = packageManager
+            .queryIntentServices(Intent(LightConstants.ACTION_BIND_SDK_SERVICE), 0)
+            .map { it.serviceInfo.packageName }
+            .distinct()
+        return when {
+            declared in installed -> declared
+            installed.isNotEmpty() -> installed.first().also {
+                Log.i(TAG, "declared server '$declared' not installed; using '$it'")
+            }
+            else -> declared.also {
+                Log.w(TAG, "no SDK server found on device; falling back to declared '$it'")
+            }
         }
     }
 

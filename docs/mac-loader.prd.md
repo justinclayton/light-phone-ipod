@@ -1,6 +1,6 @@
 # PRD: macOS companion app for the LP3 music tool
 
-- **Status:** Draft — ready for technical design
+- **Status:** Implemented (phone: `tool/`, Mac: `mac/`); §12 hardware assumptions still unverified
 - **Date:** 2026-09-01
 - **Related:** `docs/ipod.adr.md` (the on-phone music tool, v1 implemented); `docs/mac-loader.protocol.md` (the wire protocol the phone side implements)
 - **Audience of record:** one household — the operator is a teenager, not the author

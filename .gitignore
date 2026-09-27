@@ -54,3 +54,9 @@ bin/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+### Mac companion app (mac/) ###
+mac/*.xcodeproj
+mac/build/
+mac/DerivedData/
+xcuserdata/
+mac/Loader/Resources/Info.plist

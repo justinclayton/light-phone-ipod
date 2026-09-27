@@ -1,6 +1,6 @@
 # Mac ↔ phone sync protocol (v1)
 
-- **Status:** Implemented on the phone (`tool/…/data/sync/`), to be implemented on the Mac
+- **Status:** Implemented on both sides — phone `tool/…/data/sync/`, Mac `mac/` (see `mac/README.md`)
 - **Related:** `docs/mac-loader.prd.md` (product), `docs/ipod.adr.md` D2 (storage layout)
 
 The phone pulls; the Mac serves (PRD §3). The Mac runs a small HTTPS server on the

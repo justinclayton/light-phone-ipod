@@ -97,6 +97,11 @@ object ManifestGenerator {
             |        <intent>
             |            <action android:name="com.thelightphone.sdk.ACTION_SDK_MARKER" />
             |        </intent>
+            |        <!-- Lets LightSdkApplication see which SDK server (LightOS or the
+            |             emulator) is actually installed, so one APK runs on both. -->
+            |        <intent>
+            |            <action android:name="com.thelightphone.sdk.action.BIND_SERVICE" />
+            |        </intent>
             |    </queries>
             |</manifest>""".trimMargin()
         )
