@@ -35,3 +35,30 @@ const val TRACK_END_THRESHOLD_MS = 750L
 
 fun isAtTrackEnd(positionMs: Long, durationMs: Long): Boolean =
     durationMs > 0L && positionMs >= durationMs - TRACK_END_THRESHOLD_MS
+
+/** Result of dropping a deleted track from the playback queue. */
+data class QueueRemoval(
+    val queue: List<TrackEntity>,
+    /** Index to play from in [queue]; `NO_MEDIA_ITEM`-equivalent (-1) when [queue] is empty. */
+    val currentIndex: Int,
+    /** True when the removed track was the one playing, so playback must move on to a new item. */
+    val currentRemoved: Boolean,
+)
+
+/**
+ * Removes [trackId] from [queue]. If it was the current track, the item that
+ * followed it becomes current (or the new last item); otherwise the current
+ * track is kept and its index shifted.
+ */
+fun removeTrackFromQueue(queue: List<TrackEntity>, currentIndex: Int, trackId: Long): QueueRemoval {
+    val removedIndex = queue.indexOfFirst { it.id == trackId }
+    if (removedIndex < 0) return QueueRemoval(queue, currentIndex, currentRemoved = false)
+    val remaining = queue.filterIndexed { i, _ -> i != removedIndex }
+    if (remaining.isEmpty()) return QueueRemoval(remaining, -1, currentRemoved = removedIndex == currentIndex)
+    return when {
+        removedIndex == currentIndex ->
+            QueueRemoval(remaining, currentIndex.coerceAtMost(remaining.lastIndex), currentRemoved = true)
+        removedIndex < currentIndex -> QueueRemoval(remaining, currentIndex - 1, currentRemoved = false)
+        else -> QueueRemoval(remaining, currentIndex, currentRemoved = false)
+    }
+}

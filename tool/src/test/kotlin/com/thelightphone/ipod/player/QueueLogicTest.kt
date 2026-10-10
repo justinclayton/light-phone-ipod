@@ -61,4 +61,52 @@ class QueueLogicTest {
     fun trackEndDetectionIgnoresUnknownDuration() {
         assertFalse(isAtTrackEnd(positionMs = 0L, durationMs = 0L))
     }
+
+    private fun queueOf(n: Int) = (1..n).map { track("t$it").copy(id = it.toLong()) }
+
+    @Test
+    fun removingTheCurrentTrackAdvancesToTheNextOne() {
+        val result = removeTrackFromQueue(queueOf(4), currentIndex = 1, trackId = 2)
+        assertEquals(listOf(1L, 3L, 4L), result.queue.map { it.id })
+        assertEquals(1, result.currentIndex)
+        assertTrue(result.currentRemoved)
+    }
+
+    @Test
+    fun removingTheLastCurrentTrackFallsBackToTheNewLast() {
+        val result = removeTrackFromQueue(queueOf(3), currentIndex = 2, trackId = 3)
+        assertEquals(1, result.currentIndex)
+        assertTrue(result.currentRemoved)
+    }
+
+    @Test
+    fun removingAnEarlierTrackShiftsTheCurrentIndex() {
+        val result = removeTrackFromQueue(queueOf(4), currentIndex = 2, trackId = 1)
+        assertEquals(1, result.currentIndex)
+        assertEquals(3L, result.queue[result.currentIndex].id)
+        assertFalse(result.currentRemoved)
+    }
+
+    @Test
+    fun removingALaterTrackLeavesTheCurrentIndex() {
+        val result = removeTrackFromQueue(queueOf(4), currentIndex = 1, trackId = 4)
+        assertEquals(1, result.currentIndex)
+        assertFalse(result.currentRemoved)
+    }
+
+    @Test
+    fun removingTheOnlyTrackEmptiesTheQueue() {
+        val result = removeTrackFromQueue(queueOf(1), currentIndex = 0, trackId = 1)
+        assertTrue(result.queue.isEmpty())
+        assertEquals(-1, result.currentIndex)
+    }
+
+    @Test
+    fun removingAnUnqueuedTrackChangesNothing() {
+        val queue = queueOf(3)
+        val result = removeTrackFromQueue(queue, currentIndex = 1, trackId = 99)
+        assertEquals(queue, result.queue)
+        assertEquals(1, result.currentIndex)
+        assertFalse(result.currentRemoved)
+    }
 }

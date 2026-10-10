@@ -22,6 +22,7 @@ data class PlaylistTrackRow(
 )
 
 private const val PLAYLISTS_DIR = "playlists"
+private const val MUSIC_DIR = "music"
 
 class LibraryRepository(
     private val trackDao: TrackDao,
@@ -82,6 +83,29 @@ class LibraryRepository(
         val result = scanner.scan()
         importM3uPlaylists()
         result
+    }
+
+    /**
+     * Permanently deletes a song: its file, its library row, and its place in every
+     * playlist (m3u8 mirrors are rewritten). No rescan needed — the row is removed
+     * directly, so the song vanishes from Artists / Albums / Songs immediately.
+     */
+    suspend fun deleteTrack(trackId: Long) = scanLock.withLock {
+        val track = trackDao.getById(trackId) ?: return@withLock
+        val playlistIds = playlistDao.playlistIdsContaining(trackId)
+        fileShare.delete("$MUSIC_DIR/${track.path}")
+        pruneEmptyDirs(track.path)
+        trackDao.deleteById(trackId) // playlist_entries cascade
+        playlistIds.forEach { exportPlaylist(it) }
+    }
+
+    /** Removes now-empty album/artist folders left behind by [deletedPath], never the music root. */
+    private fun pruneEmptyDirs(deletedPath: String) {
+        var dir = deletedPath.substringBeforeLast('/', missingDelimiterValue = "")
+        while (dir.isNotEmpty() && fileShare.list("$MUSIC_DIR/$dir").isEmpty()) {
+            fileShare.delete("$MUSIC_DIR/$dir")
+            dir = dir.substringBeforeLast('/', missingDelimiterValue = "")
+        }
     }
 
     // ---- Playlist mutations (D3: Room is source of truth, mirrored to m3u8) ----

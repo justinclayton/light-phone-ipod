@@ -160,6 +160,49 @@ class PlayerController(
         persistNow()
     }
 
+    /**
+     * Drops a just-deleted track from the queue. Deleting the playing track moves
+     * on to the next one (still playing if it was); deleting the last remaining
+     * track empties the queue and stops playback.
+     */
+    fun removeTrack(trackId: Long) {
+        if (_queue.value.none { it.id == trackId } && sourceQueue.none { it.id == trackId }) return
+        val wasPlaying = isPlaying.value
+        val position = positionMs.value
+        val removal = removeTrackFromQueue(_queue.value, _currentIndex.value, trackId)
+        sourceQueue = sourceQueue.filter { it.id != trackId }
+        _queue.value = removal.queue
+
+        if (removal.queue.isEmpty()) {
+            player.stop()
+            player.setMediaQueue(emptyList())
+            _currentIndex.value = NO_MEDIA_ITEM
+            restoredPositionMs = 0L
+            clearPersistedQueue()
+            return
+        }
+
+        _currentIndex.value = removal.currentIndex
+        pushToPlayer(removal.currentIndex)
+        if (removal.currentRemoved) {
+            if (wasPlaying) player.play()
+        } else {
+            player.seekTo(position)
+            if (wasPlaying) player.play()
+        }
+        persistNow()
+    }
+
+    private fun clearPersistedQueue() {
+        scope.launch {
+            dataStore.edit { prefs ->
+                prefs.remove(QUEUE_IDS_KEY)
+                prefs.remove(CURRENT_TRACK_ID_KEY)
+                prefs.remove(POSITION_MS_KEY)
+            }
+        }
+    }
+
     private fun advanceManually(delta: Int) {
         val q = _queue.value
         if (q.isEmpty()) return
