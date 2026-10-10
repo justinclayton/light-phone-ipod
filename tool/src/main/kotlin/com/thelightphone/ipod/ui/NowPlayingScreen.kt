@@ -132,7 +132,7 @@ class NowPlayingScreen(private val sealedActivity: SealedLightActivity) :
                         .padding(top = 1f.gridUnitsAsDp()),
                 ) {
                     LightText(
-                        text = "SHUFFLE",
+                        text = if (shuffle) "SHUFFLE: ON" else "SHUFFLE: OFF",
                         variant = LightTextVariant.Superfine,
                         lighten = !shuffle,
                         modifier = Modifier.weight(1f).lightClickable(onClick = viewModel::toggleShuffle),

@@ -27,7 +27,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
 
 private val QUEUE_IDS_KEY = stringPreferencesKey("player_queue_track_ids")
 private val CURRENT_TRACK_ID_KEY = longPreferencesKey("player_current_track_id")
@@ -36,8 +35,6 @@ private val SHUFFLE_KEY = booleanPreferencesKey("player_shuffle")
 private val REPEAT_KEY = stringPreferencesKey("player_repeat")
 
 private const val PERSIST_INTERVAL_MS = 5_000L
-private const val QUEUE_SWAP_SETTLE_MS = 100L
-private const val QUEUE_SWAP_TIMEOUT_MS = 3_000L
 
 /**
  * The single shared [com.thelightphone.sdk.audio.LightAudioPlayer] (D6). Owned
@@ -149,16 +146,11 @@ class PlayerController(
     fun toggleShuffle() {
         _shuffle.value = !_shuffle.value
         val anchor = currentTrack.value?.let { sourceQueue.indexOf(it) }?.takeIf { it >= 0 } ?: 0
-        val wasPlaying = isPlaying.value
-        val position = positionMs.value
         applyShuffle(anchorIndex = anchor)
-        pushToPlayer(_currentIndex.value)
-        scope.launch {
-            // seekTo clamps to the duration, which is unknown until the new queue's item is prepared.
-            delay(QUEUE_SWAP_SETTLE_MS)
-            withTimeoutOrNull(QUEUE_SWAP_TIMEOUT_MS) { player.durationMs.first { it > 0L } }
-            player.seekTo(position)
-            if (wasPlaying) player.play()
+        // A fresh (idle-stopped) session has no queue yet; togglePlayPause() pushes it on next Play.
+        if (player.currentMediaItemIndex.value != NO_MEDIA_ITEM && _queue.value.isNotEmpty()) {
+            // Reorder around the playing track rather than replacing the queue, so playback never stalls.
+            player.reorderQueueAroundCurrent(_queue.value.map { it.toAudioItem() }, _currentIndex.value)
         }
         persistNow()
     }
