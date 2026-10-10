@@ -25,4 +25,10 @@ interface LightEntryPoint {
     // You probably want to leave this as "false" unless you're building for alternate devices.
     val enableRecentsScreenshots: Boolean
         get() = false
+
+    // By default the volume rocker is forwarded to LightOS, which adjusts the ringer. Media tools
+    // should return true so the rocker adjusts media volume (with an SDK-drawn volume modal)
+    // while the tool is in the foreground, whether or not anything is playing.
+    val volumeKeysControlMedia: Boolean
+        get() = false
 }
