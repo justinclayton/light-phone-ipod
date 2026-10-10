@@ -34,6 +34,9 @@ interface TrackDao {
     @Query("UPDATE tracks SET missing = 1 WHERE id IN (:ids)")
     suspend fun markMissing(ids: List<Long>)
 
+    @Query("DELETE FROM tracks WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
     @Query("SELECT COUNT(*) FROM tracks WHERE NOT missing")
     suspend fun count(): Int
 }

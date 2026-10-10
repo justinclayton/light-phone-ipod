@@ -143,8 +143,8 @@ Stated so they don't creep in:
   dock: things pass through it.
 - **No syncing folders.** There is no watched folder and no mirroring. Dropping
   is the only way music moves.
-- **No deletion.** Removing a song from the Mac does not remove it from the
-  phone. See §10.
+- **No deletion from the Mac.** Removing a song from the Mac does not remove it
+  from the phone; songs are deleted on the phone itself. See §10.
 - **No playlist management.** Playlists are a phone-side feature.
 - **No transcoding or tag editing.** The app never modifies a file.
 - **No Music.app integration.** Files come from Finder. Dragging out of Music
@@ -156,11 +156,11 @@ Stated so they don't creep in:
 
 These are accepted for v1 and should be written down rather than discovered:
 
-- **Music can only be added, never removed.** Neither the app nor the tool can
-  delete a song from the phone. The library only grows. When the phone fills up,
-  there is no remedy available to her — it requires the author and a cable. This
-  is fine for a while and will stop being fine; the trigger for solving it is the
-  first time storage is a problem.
+- **Music is removed on the phone, never from the Mac.** The iPod tool can
+  delete a song (Songs → EDIT → trash → confirm); the Mac app has no picture of
+  the phone's library and cannot ask for a deletion. A deleted song is not
+  re-sent, because the Mac drops an item from its queue once the phone acks it.
+  Dropping the same file on the Mac again sends it again.
 - **Both devices must be awake and on the same network.** A closed laptop lid
   means no sync. The app must say so rather than appear broken.
 - **The Mac app must stay open** while songs are waiting. A background helper
@@ -176,7 +176,8 @@ Roughly in order of value:
    keyboard, rather than living with it on the phone.
 2. **Background helper** — drops sync whenever the phone next asks, without the
    app being open.
-3. **Removing music from the phone**, once storage becomes a real constraint.
+3. **Removing music from the Mac side** (the phone can already delete its own
+   songs); needs a library picture on the Mac and a new protocol endpoint.
 4. **Playlists from the Mac** — the tool already imports playlist files, so this
    is largely a matter of authoring them.
 5. **Automatic discovery** on the local network, so pairing is invisible after

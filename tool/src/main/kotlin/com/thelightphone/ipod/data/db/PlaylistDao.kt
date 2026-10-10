@@ -36,6 +36,9 @@ interface PlaylistDao {
     @Query("SELECT * FROM playlist_entries WHERE playlistId = :playlistId ORDER BY position ASC")
     suspend fun entries(playlistId: Long): List<PlaylistEntryEntity>
 
+    @Query("SELECT DISTINCT playlistId FROM playlist_entries WHERE trackId = :trackId")
+    suspend fun playlistIdsContaining(trackId: Long): List<Long>
+
     @Query("SELECT COALESCE(MAX(position), -1) FROM playlist_entries WHERE playlistId = :playlistId")
     suspend fun maxPosition(playlistId: Long): Int
 

@@ -101,8 +101,9 @@ queued, the phone sees the same-size file already there, and acks again.
   Albums / Songs with no further action.
 - Interrupted transfer policy (PRD §14): the cut-off file is discarded and
   retried next sync; files already copied stay. Resume is at queue granularity.
-- The phone never deletes music and never talks to anything but the paired
-  host:port. There is no discovery in v1.
+- The phone never deletes music *as part of a sync*: only the person using the
+  phone can remove a song, and a sync never removes one. It never talks to
+  anything but the paired host:port. There is no discovery in v1.
 
 ## 4. What the phone shows for each failure
 

@@ -31,5 +31,9 @@ class FakeTrackDao : TrackDao {
         state.value = state.value.map { if (it.id in ids) it.copy(missing = true) else it }
     }
 
+    override suspend fun deleteById(id: Long) {
+        state.value = state.value.filterNot { it.id == id }
+    }
+
     override suspend fun count(): Int = state.value.count { !it.missing }
 }
