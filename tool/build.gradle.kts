@@ -26,6 +26,18 @@ android {
         targetSdk = rootProject.ext["targetSdk"] as Int
 
         manifestPlaceholders["sdkVersion"] = property("sdkVersion") as String
+
+        // Shown under Settings so it's obvious which build is on the phone.
+        val gitSha = providers.exec {
+            commandLine("git", "rev-parse", "--short", "HEAD")
+            isIgnoreExitValue = true
+        }.standardOutput.asText.get().trim().ifEmpty { "unknown" }
+        buildConfigField("String", "GIT_SHA", "\"$gitSha\"")
+        buildConfigField("long", "BUILD_TIME_MS", "${System.currentTimeMillis()}L")
+    }
+
+    buildFeatures {
+        buildConfig = true
     }
 
     buildTypes {
