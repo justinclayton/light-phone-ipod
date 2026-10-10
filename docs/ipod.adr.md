@@ -106,7 +106,7 @@ exist per process — SDK enforces this). Declare `capabilities =
 ["detached-audio"]` in `lighttool.toml`. Queue semantics: selecting a song in
 any list replaces the queue with that list's songs, positioned at the
 selection (iPod behavior). Shuffle re-orders the queue (current song first);
-repeat one/all via player position/queue handling. Persist last
+repeat one/all handled at track end (the queue is never swapped when changing repeat mode). Persist last
 queue/position in DataStore so Now Playing survives relaunch.
 Reference implementation for detached mode quirks: `examples/audio-demo/PlayerScreen.kt`
 and `docs/design_decisions/detached_audio.md`.

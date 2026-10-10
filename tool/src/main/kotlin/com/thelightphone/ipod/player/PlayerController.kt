@@ -27,6 +27,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 private val QUEUE_IDS_KEY = stringPreferencesKey("player_queue_track_ids")
 private val CURRENT_TRACK_ID_KEY = longPreferencesKey("player_current_track_id")
@@ -35,6 +36,8 @@ private val SHUFFLE_KEY = booleanPreferencesKey("player_shuffle")
 private val REPEAT_KEY = stringPreferencesKey("player_repeat")
 
 private const val PERSIST_INTERVAL_MS = 5_000L
+private const val QUEUE_SWAP_SETTLE_MS = 100L
+private const val QUEUE_SWAP_TIMEOUT_MS = 3_000L
 
 /**
  * The single shared [com.thelightphone.sdk.audio.LightAudioPlayer] (D6). Owned
@@ -80,7 +83,14 @@ class PlayerController(
     init {
         scope.launch {
             player.currentMediaItemIndex.collect { idx ->
-                if (idx != NO_MEDIA_ITEM && _repeat.value != RepeatMode.One) _currentIndex.value = idx
+                if (idx == NO_MEDIA_ITEM) return@collect
+                if (_repeat.value == RepeatMode.One && idx != _currentIndex.value) {
+                    // Repeat-one: media3 auto-advanced at track end. Go back to the repeating track.
+                    pushToPlayer(_currentIndex.value)
+                    player.play()
+                } else {
+                    _currentIndex.value = idx
+                }
             }
         }
         scope.launch { watchForTrackEnd() }
@@ -143,20 +153,20 @@ class PlayerController(
         val position = positionMs.value
         applyShuffle(anchorIndex = anchor)
         pushToPlayer(_currentIndex.value)
-        player.seekTo(position)
-        if (wasPlaying) player.play()
+        scope.launch {
+            // seekTo clamps to the duration, which is unknown until the new queue's item is prepared.
+            delay(QUEUE_SWAP_SETTLE_MS)
+            withTimeoutOrNull(QUEUE_SWAP_TIMEOUT_MS) { player.durationMs.first { it > 0L } }
+            player.seekTo(position)
+            if (wasPlaying) player.play()
+        }
         persistNow()
     }
 
     fun cycleRepeat() {
-        val wasPlaying = isPlaying.value
-        val position = positionMs.value
         _repeat.value = _repeat.value.next()
-        if (_queue.value.isNotEmpty()) {
-            pushToPlayer(_currentIndex.value)
-            player.seekTo(position)
-            if (wasPlaying) player.play()
-        }
+        // Repeat only matters at track end (see watchForTrackEnd and the index
+        // collector in init), so the player is never touched here.
         persistNow()
     }
 
@@ -175,17 +185,11 @@ class PlayerController(
         _currentIndex.value = if (_shuffle.value) 0 else safeAnchor
     }
 
-    /** Pushes the effective queue to the player. Repeat-one uses a single-item queue (see ADR D6). */
+    /** Pushes the full queue to the player, whatever the repeat mode (repeat-one is handled at track end). */
     private fun pushToPlayer(startAt: Int) {
         val q = _queue.value
         if (q.isEmpty() || startAt !in q.indices) return
-        val items = if (_repeat.value == RepeatMode.One) {
-            listOf(q[startAt].toAudioItem())
-        } else {
-            q.map { it.toAudioItem() }
-        }
-        val start = if (_repeat.value == RepeatMode.One) 0 else startAt
-        player.setMediaQueue(items, start)
+        player.setMediaQueue(q.map { it.toAudioItem() }, startAt)
     }
 
     private fun TrackEntity.toAudioItem() = LightAudioItem(
