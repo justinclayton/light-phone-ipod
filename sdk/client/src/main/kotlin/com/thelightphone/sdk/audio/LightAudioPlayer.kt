@@ -203,6 +203,37 @@ class LightAudioPlayer internal constructor(
     }
 
     /**
+     * Replaces every queue item except the current one, which becomes
+     * [currentIndex] of [items] and keeps playing uninterrupted (e.g. a shuffle
+     * toggle). [items] at [currentIndex] should be the current item. With an
+     * empty player this behaves like [setMediaQueue].
+     *
+     * @throws IllegalArgumentException when [currentIndex] is not in [items]
+     */
+    fun reorderQueueAroundCurrent(items: List<LightAudioItem>, currentIndex: Int) {
+        require(currentIndex in items.indices) { "Current index must reference a queue item" }
+        val mediaItems = items.mapIndexed { index, item -> item.toMediaItem(index) }
+        commands.dispatch { player ->
+            if (player.mediaItemCount == 0) {
+                player.setMediaItems(mediaItems, currentIndex, C.TIME_UNSET)
+                player.prepare()
+            } else {
+                val playing = player.currentMediaItemIndex
+                player.removeMediaItems(playing + 1, player.mediaItemCount)
+                player.removeMediaItems(0, playing)
+                val before = mediaItems.subList(0, currentIndex)
+                val after = mediaItems.subList(currentIndex + 1, mediaItems.size)
+                if (before.isNotEmpty()) player.addMediaItems(0, before)
+                if (after.isNotEmpty()) player.addMediaItems(after)
+            }
+            // The current item never transitions, so onMediaItemTransition won't report the new index.
+            _currentMediaItemIndex.value = currentIndex
+            updateDuration(player)
+            updatePosition(player)
+        }
+    }
+
+    /**
      * Start or resume playback if audio focus is available.
      *
      * Observe [isPlaying] for the actual playback state.
