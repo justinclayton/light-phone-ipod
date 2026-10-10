@@ -81,3 +81,48 @@ tool's OWN storage instead. Three routes, best-first:
 
 The trade-off vs the built-in Music tool: files live twice on the phone (its
 copy + ours) until Light exposes the shared library.
+
+---
+
+# Lock-screen / now-playing controls for iPod (issue #3)
+
+**Question:** Can iPod playback show play/pause (and prev/next, title) on the
+LP3 lock screen, like the built-in Music tool?
+
+**Short answer:** No, and it isn't something iPod can fix. Playback continues
+when the phone locks, but LightOS shows no controls. iPod's `MediaSession` is
+complete; LightOS appears not to consume tool sessions.
+
+## Evidence (real LP3, TLP301, 2026-10-10)
+
+Playing a track in iPod, then `adb shell dumpsys media_session`:
+
+- Session `androidx.media3.session.id.com.thelightphone.ipod` is `active=true`
+  and is the current media-button session.
+- `state=PLAYING`, queue size 2.
+- Metadata present: title, artist, album (album shows "Unknown Album" only
+  because that file has no album tag).
+- `actions=7340027` = stop, pause, skip-prev, skip-next, seek, play/pause.
+  (Play is absent only because it is already playing; media3 omits it.)
+- LightOS's own `com.lightos/AudioPlayer` session was `active=false`, `PAUSED`
+  the whole time, while the iPod session played.
+- iPod's session has `launchIntent=null`. Not known whether LightOS needs it.
+
+Nothing appeared on the lock screen; the user confirmed controls did not display.
+
+## Conclusion
+
+Nothing iPod controls is missing: the session is active, carries metadata, and
+advertises transport actions. The gap is on the LightOS side. LightOS source
+isn't available here, so *why* (allowlist, only its own player, a missing
+`launchIntent`) is unconfirmed. The emulator can't help: its lock screen
+(`LightLockscreen`) is an unlock screen only and never queries
+`MediaSessionManager`.
+
+## Upstream request to Light
+
+Render lock-screen and now-playing controls from active `MediaSession`s owned by
+tools with `detached-audio`, or document what gate applies (capability flag,
+session requirements such as a `launchIntent`) so tools can meet it.
+`docs/design_decisions/detached_audio.md` describes this as the intended LightOS
+contract; it doesn't currently hold on LP3 hardware.
