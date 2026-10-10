@@ -1,6 +1,7 @@
 package com.thelightphone.sdk
 
 import android.content.Context
+import android.media.AudioManager
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -28,6 +29,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.thelightphone.lp3Keyboard.ui.LightDeviceKeys
+import com.thelightphone.sdk.audio.MediaVolumeKeys
 import com.thelightphone.sdk.shared.LightServiceMethod
 import com.thelightphone.sdk.ui.LightModalManager
 import com.thelightphone.sdk.ui.LocalHapticsEnabled
@@ -61,6 +63,7 @@ class LightActivity internal constructor() : ComponentActivity() {
     private val currentScreen = mutableStateOf<BackStackEntry<*>?>(null)
     private var contentReady = false
     private val createdAt = android.os.SystemClock.elapsedRealtime()
+    private var mediaVolumeKeys: MediaVolumeKeys? = null
 
     internal fun <T> navigateTo(screen: SimpleLightScreen<T>, resultCallback: ((T) -> Unit)? = null) {
         currentScreen.value?.screen?.notifyWillHide()
@@ -95,6 +98,11 @@ class LightActivity internal constructor() : ComponentActivity() {
 
         // Avoids a stale-content flash when resuming from a stopped task (if false)
         setRecentsScreenshotEnabled(LightSdkRegistry.entryPoint?.enableRecentsScreenshots == true)
+
+        if (LightSdkRegistry.entryPoint?.volumeKeysControlMedia == true) {
+            volumeControlStream = AudioManager.STREAM_MUSIC
+            mediaVolumeKeys = MediaVolumeKeys(this)
+        }
 
         WindowCompat.setDecorFitsSystemWindows(window, false)
         val controller = WindowInsetsControllerCompat(window, window.decorView)
@@ -157,6 +165,9 @@ class LightActivity internal constructor() : ComponentActivity() {
         } else if (currentScreen.value?.screen?.onKeyDown(keyCode, event) == true) {
             // let the active screen handle the button if it wants to
             true
+        } else if (mediaVolumeKeys?.onKeyDown(keyCode) == true) {
+            // media tools keep the volume rocker instead of LightOS adjusting the ringer
+            true
         } else if (LightDeviceKeys.mapping.containsKey(keyCode)) {
             // otherwise see if the server wants to use it
             forwardKeyEventToServer(keyCode, event)
@@ -175,6 +186,9 @@ class LightActivity internal constructor() : ComponentActivity() {
             super.onKeyMultiple(keyCode, repeatCount, event)
         } else if (currentScreen.value?.screen?.onKeyMultiple(keyCode, repeatCount, event) == true) {
             true
+        } else if (mediaVolumeKeys?.onKeyUp(keyCode) == true) {
+            // volume repeats arrive through onKeyDown; just keep these from reaching LightOS
+            true
         } else if (LightDeviceKeys.mapping.containsKey(keyCode)) {
             forwardKeyEventToServer(keyCode, event)
             true
@@ -187,6 +201,8 @@ class LightActivity internal constructor() : ComponentActivity() {
         return if (keyCode.isSystemKeyCode) {
             super.onKeyUp(keyCode, event)
         } else if (currentScreen.value?.screen?.onKeyUp(keyCode, event) == true) {
+            true
+        } else if (mediaVolumeKeys?.onKeyUp(keyCode) == true) {
             true
         } else if (LightDeviceKeys.mapping.containsKey(keyCode)) {
             forwardKeyEventToServer(keyCode, event)
