@@ -38,3 +38,16 @@ subprojects {
         }
     }
 }
+
+// PR gate run by .github/workflows/pr-check.yml. Same coverage as `check`,
+// minus the upstream example apps (the iPod tool doesn't depend on them) and
+// minus release-variant unit tests, which re-run the debug tests unchanged.
+tasks.register("ciCheck") {
+    group = "verification"
+    description = "Debug unit tests + lint for the iPod tool, SDK and lint rules."
+    dependsOn(
+        listOf(":tool", ":sdk:client", ":sdk:ui", ":sdk:server", ":sdk:emulator")
+            .flatMap { listOf("$it:testDebugUnitTest", "$it:lint") } +
+            listOf(":sdk:shared:check", ":lint-rules:check"),
+    )
+}
